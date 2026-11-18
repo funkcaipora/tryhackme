@@ -1,0 +1,242 @@
+<title>{{SCOPE_NAME}} Security Scan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: a status header (scope, stage progress, counts by priority), then
+   one section per completed stage. At stage 10 the consolidated summary is
+   inserted above the stages. One reading column; tables scroll in their own box. */
+:root {
+  --bg: #F4F6FA;
+  --surface: #FFFFFF;
+  --sunken: #E8ECF3;
+  --fg: #16202C;
+  --muted: #566475;
+  --rule: #D3DAE5;
+  --rule-strong: #A9B5C6;
+  --accent: #1D4ED8;
+  --p0: #A3231B;      --p0-soft: #FBE6E3;
+  --p1: #8A5200;      --p1-soft: #FBEED5;
+  --p2: #4A5868;      --p2-soft: #E8ECF3;
+  --found: #285F94;   --found-soft: #E1ECF7;
+  --fix: #1F6A45;     --fix-soft: #DFF0E7;
+  --exploit: #9A4409; --exploit-soft: #F9E9DA;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E131A; --surface: #151C26; --sunken: #1B2431; --fg: #E4E9F0; --muted: #9AA7B8;
+    --rule: #2A3545; --rule-strong: #46556B; --accent: #8FB0FF;
+    --p0: #FF9D94; --p0-soft: #3D1714; --p1: #F2B866; --p1-soft: #3A2A0C; --p2: #B4C0CF; --p2-soft: #1B2431;
+    --found: #86B7E8; --found-soft: #172A3D; --fix: #74C79F; --fix-soft: #15301F;
+    --exploit: #F2A56B; --exploit-soft: #3A2412;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E131A; --surface: #151C26; --sunken: #1B2431; --fg: #E4E9F0; --muted: #9AA7B8;
+  --rule: #2A3545; --rule-strong: #46556B; --accent: #8FB0FF;
+  --p0: #FF9D94; --p0-soft: #3D1714; --p1: #F2B866; --p1-soft: #3A2A0C; --p2: #B4C0CF; --p2-soft: #1B2431;
+  --found: #86B7E8; --found-soft: #172A3D; --fix: #74C79F; --fix-soft: #15301F;
+  --exploit: #F2A56B; --exploit-soft: #3A2412;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 400 1rem/1.6 var(--font-body); -webkit-text-size-adjust: 100%; }
+h1, h2, h3, p, ul, ol, dl, dd { margin: 0; }
+.page {
+  max-width: 960px;
+  margin-inline: auto;
+  padding-block: 40px 80px;
+  padding-left: max(clamp(16px, 4vw, 40px), env(safe-area-inset-left, 0px));
+  padding-right: max(clamp(16px, 4vw, 40px), env(safe-area-inset-right, 0px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 48px;
+}
+.block { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.15; letter-spacing: -0.01em; text-wrap: balance; }
+h1 { font-size: clamp(1.6rem, 5vw, 2.4rem); font-weight: 700; overflow-wrap: anywhere; }
+h2 { font-size: 1.35rem; font-weight: 600; }
+h3 { font-size: 1rem; font-weight: 600; }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code { font-family: var(--font-mono); font-size: 0.9em; background: var(--sunken); padding: 0.08em 0.32em; border-radius: 3px; overflow-wrap: anywhere; }
+.eyebrow { font: 500 0.78rem/1.4 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lede { font-size: 1.0625rem; max-width: 70ch; overflow-wrap: anywhere; }
+.muted { color: var(--muted); }
+
+/* stage progress */
+.progress { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.progress li { display: inline-flex; align-items: baseline; gap: 6px; padding: 5px 10px; border: 1px solid var(--rule-strong); border-radius: 4px; font-size: 0.82rem; white-space: nowrap; }
+.progress .n { font: 500 0.76rem/1 var(--font-mono); font-variant-numeric: tabular-nums; }
+.progress .done { background: var(--fix-soft); border-color: var(--fix); color: var(--fix); }
+.progress .current { background: var(--surface); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.progress .todo { color: var(--muted); border-style: dashed; }
+
+/* counts by priority: the figures are the point of this header */
+.counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.count { display: grid; gap: 2px; padding: 14px 16px; border-radius: 6px; }
+.count dt { font: 500 0.78rem/1.3 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; }
+.count dd { font: 700 2rem/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+.count small { font: 400 0.82rem/1.4 var(--font-body); }
+.count-p0 { background: var(--p0-soft); color: var(--p0); }
+.count-p1 { background: var(--p1-soft); color: var(--p1); }
+.count-p2 { background: var(--p2-soft); color: var(--p2); }
+
+.callout { padding: 14px 16px; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; overflow-wrap: anywhere; }
+
+/* stages */
+.stage { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; padding-top: 24px; border-top: 1px solid var(--rule-strong); }
+.stage-head { display: grid; grid-template-columns: 3rem minmax(0, 1fr); gap: 4px 12px; }
+.stage-n { font: 500 1.2rem/1.2 var(--font-mono); color: var(--accent); font-variant-numeric: tabular-nums; }
+.stage-q { color: var(--muted); font-style: italic; }
+.stage-meta { grid-column: 2; font-size: 0.88rem; color: var(--muted); overflow-wrap: anywhere; }
+.part { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.tag { justify-self: start; font: 500 0.74rem/1 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 8px; border-radius: 3px; }
+.tag-found { color: var(--found); background: var(--found-soft); }
+.tag-fix { color: var(--fix); background: var(--fix-soft); }
+.tag-exploit { color: var(--exploit); background: var(--exploit-soft); }
+.tag-arch { color: var(--fg); background: var(--sunken); }
+.items { list-style: none; padding: 0; display: grid; gap: 10px; }
+.item { display: grid; grid-template-columns: 3.4rem minmax(0, 1fr); gap: 0 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; }
+.item-body { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.item-title { font-weight: 600; }
+.item-detail { font-size: 0.94rem; }
+.item-meta { font-size: 0.82rem; color: var(--muted); }
+.prio { align-self: start; justify-self: start; font: 500 0.78rem/1 var(--font-mono); padding: 5px 6px; border-radius: 3px; white-space: nowrap; }
+.prio-p0 { color: var(--p0); background: var(--p0-soft); }
+.prio-p1 { color: var(--p1); background: var(--p1-soft); }
+.prio-p2 { color: var(--p2); background: var(--p2-soft); }
+.prio-none { color: var(--muted); background: var(--sunken); }
+.plain { list-style: none; padding: 0; display: grid; gap: 4px; font-size: 0.94rem; }
+
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 0.92rem; }
+th, td { text-align: left; vertical-align: top; padding: 9px 14px 9px 0; border-bottom: 1px solid var(--rule); }
+th { font: 500 0.74rem/1.4 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); border-bottom-color: var(--rule-strong); }
+td.num { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 520px) {
+  .stage-head { grid-template-columns: 2.2rem minmax(0, 1fr); }
+  .item { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}
+</style>
+
+<!--
+  TEMPLATE NOTES: remove this comment from the rendered page.
+  scripts/render_report.py --live fills this file from the blackboard. To fill it by hand:
+  - Replace every {{PLACEHOLDER}}. The {{t.something}} ones are fixed labels: write them
+    in the user's language (assets/i18n/ has the wording for the languages shipped).
+  - PROGRESS_ITEM: one per stage, 0 to 10, with the class done, current or todo.
+  - STAGE: repeat the whole block once per completed stage, in stage order.
+  - ARCH: keep it only in stage 0. Repeat ARCH_ROW, JEWEL and COVERAGE_ROW as needed.
+  - FOUND_ITEM, FIX_ITEM, EXPLOIT_ITEM: repeat per item. CHIP is the priority (P0, P1, P2)
+    with CHIP_CLASS p0, p1 or p2; for plain facts and for "leads to" use CHIP_CLASS none.
+    When a part is empty, keep the part and write one item saying nothing was found.
+  - "What could be exploited" describes a condition and what it gives an attacker.
+    No payloads, no commands, no attack steps.
+  - CONSOLIDATED is added at stage 10 and stays above the stages; delete it before that.
+  - Never put a secret value on this page. Run redact.py with the check option before publishing.
+  - Keep the <title> the same for the whole run.
+-->
+
+<main class="page" lang="{{LANG}}">
+
+<header class="block">
+  <p class="eyebrow">{{t.report_kind}} · {{t.read_only}} · {{t.run}} {{RUN_ID}} · {{t.updated}} {{UPDATED_AT}}</p>
+  <h1>{{SCOPE_NAME}}</h1>
+  <p class="lede">{{SCOPE_DESCRIPTION}}</p>
+  <ol class="progress">
+    <!-- BEGIN:PROGRESS_ITEM --><li class="{{STATE}}"><span class="n">{{N}}</span>{{NAME}}</li>
+    <!-- END:PROGRESS_ITEM -->
+  </ol>
+</header>
+
+<section class="block">
+  <dl class="counts">
+    <div class="count count-p0"><dt>{{t.p0_label}}</dt><dd>{{COUNT_P0}}</dd><small>{{COUNT_P0_TO_VALIDATE}} {{t.to_validate}}</small></div>
+    <div class="count count-p1"><dt>{{t.p1_label}}</dt><dd>{{COUNT_P1}}</dd><small>{{COUNT_P1_TO_VALIDATE}} {{t.to_validate}}</small></div>
+    <div class="count count-p2"><dt>{{t.p2_label}}</dt><dd>{{COUNT_P2}}</dd><small>{{COUNT_P2_TO_VALIDATE}} {{t.to_validate}}</small></div>
+  </dl>
+  <p class="callout"><strong>{{t.most_urgent}}:</strong> {{MOST_URGENT_FIX}}</p>
+  <p class="muted">{{COVERAGE_NOTE}}</p>
+</section>
+
+<!-- BEGIN:CONSOLIDATED -->
+<section class="block" id="consolidated">
+  <h2>{{CONSOLIDATED_TITLE}}</h2>
+  <p class="lede">{{EXECUTIVE_SUMMARY}}</p>
+</section>
+<!-- END:CONSOLIDATED -->
+
+<!-- BEGIN:STAGE -->
+<section class="stage" id="stage-{{N}}">
+  <header class="stage-head">
+    <span class="stage-n">{{N}}</span>
+    <div class="block" style="gap: 4px">
+      <h2>{{STAGE_NAME}}</h2>
+      <p class="stage-q">{{STAGE_QUESTION}}</p>
+    </div>
+    <p class="stage-meta">{{STAGE_META}}</p>
+  </header>
+
+  <!-- BEGIN:ARCH -->
+  <section class="part">
+    <span class="tag tag-arch">{{t.architecture}}</span>
+    <div class="scroll" tabindex="0" role="region" aria-label="{{t.architecture}}">
+      <table>
+        <thead><tr><th>{{t.kind}}</th><th>{{t.count}}</th><th>{{t.examples}}</th></tr></thead>
+        <tbody>
+          <!-- BEGIN:ARCH_ROW --><tr><td>{{KIND}}</td><td class="num">{{COUNT}}</td><td>{{EXAMPLES}}</td></tr>
+          <!-- END:ARCH_ROW -->
+        </tbody>
+      </table>
+    </div>
+    <h3>{{t.crown_jewels}}</h3>
+    <ul class="plain">
+      <!-- BEGIN:JEWEL --><li><strong>{{NAME}}</strong> <span class="muted">{{DETAIL}}</span></li>
+      <!-- END:JEWEL -->
+    </ul>
+    <h3>{{t.coverage}}</h3>
+    <div class="scroll" tabindex="0" role="region" aria-label="{{t.coverage}}">
+      <table>
+        <thead><tr><th>{{t.part}}</th><th>{{t.seen}}</th><th>{{t.note}}</th></tr></thead>
+        <tbody>
+          <!-- BEGIN:COVERAGE_ROW --><tr><td>{{PART}}</td><td>{{SEEN}}</td><td>{{NOTE}}</td></tr>
+          <!-- END:COVERAGE_ROW -->
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <!-- END:ARCH -->
+
+  <section class="part">
+    <span class="tag tag-found">{{t.found}}</span>
+    <ul class="items">
+      <!-- BEGIN:FOUND_ITEM --><li class="item"><span class="prio prio-{{CHIP_CLASS}}">{{CHIP}}</span><div class="item-body"><p class="item-title">{{TITLE}}</p><p class="item-detail">{{DETAIL}}</p><p class="item-meta">{{META}}</p></div></li>
+      <!-- END:FOUND_ITEM -->
+    </ul>
+  </section>
+
+  <section class="part">
+    <span class="tag tag-fix">{{t.fix}}</span>
+    <ul class="items">
+      <!-- BEGIN:FIX_ITEM --><li class="item"><span class="prio prio-{{CHIP_CLASS}}">{{CHIP}}</span><div class="item-body"><p class="item-title">{{TITLE}}</p><p class="item-detail">{{DETAIL}}</p><p class="item-meta">{{META}}</p></div></li>
+      <!-- END:FIX_ITEM -->
+    </ul>
+  </section>
+
+  <section class="part">
+    <span class="tag tag-exploit">{{t.exploit}}</span>
+    <ul class="items">
+      <!-- BEGIN:EXPLOIT_ITEM --><li class="item"><span class="prio prio-{{CHIP_CLASS}}">{{CHIP}}</span><div class="item-body"><p class="item-title">{{TITLE}}</p><p class="item-detail">{{DETAIL}}</p><p class="item-meta">{{META}}</p></div></li>
+      <!-- END:EXPLOIT_ITEM -->
+    </ul>
+  </section>
+</section>
+<!-- END:STAGE -->
+
+</main>

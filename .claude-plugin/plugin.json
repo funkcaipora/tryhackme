@@ -1,0 +1,5 @@
+{
+  "name": "security-scan",
+  "description": "Read-only, inside-out security scan that follows the stages of an automated attacker and reports, stage by stage, what was found, what must be fixed and what could be exploited.",
+  "version": "0.1.0"
+}

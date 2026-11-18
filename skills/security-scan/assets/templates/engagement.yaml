@@ -1,0 +1,36 @@
+# Engagement: what this run covers and the rules it runs under.
+# Created by `blackboard.py init`, completed at the end of stage 0.
+# Schema: assets/schemas/engagement.schema.json
+
+run_id: "YYYYMMDD-HHMM"
+created_at: "YYYY-MM-DDTHH:MM:SSZ"
+completed_at: null
+status: in-progress            # in-progress | complete | stopped
+
+scope:
+  kind: repository             # repository | team | company
+  name: ""                     # how the user names it; used in report titles
+  includes: []                 # concrete: repositories, accounts, projects, tenants, services
+  excludes: []                 # anything the user ruled out
+  suggested_from: []           # the context signals behind the suggestion
+  confirmed_by_user: false     # true once the user answered the scope question
+
+mode:
+  read_only: true              # always true
+  active_checks: false         # true only if the user opted in for this run
+
+report:
+  channel: files               # artifact when the harness has an artifact tool and the user did not ask to keep it local
+  artifact_url: null           # saved after the first publish; a resumed run publishes to the same one
+  language: ""                 # language of reports and summaries, for example pt-BR
+
+limits:
+  inner_loop_passes: 3         # how many times stages 3 to 6 may repeat
+  calls_per_minute: 60         # ceiling for API calls against the user's platforms
+
+domains: []                    # playbooks in scope, set at the end of stage 0
+stages_done: []
+
+inner_loop:
+  passes_run: 0
+  ended_by: null               # no-new-facts | limit | user

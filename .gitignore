@@ -1,0 +1,13 @@
+# Output of a security-scan run: holds findings and evidence, never commit it
+.security-scan/
+
+# Local research notes, kept out of the repository on purpose
+docs/benchmarks.md
+
+# Workspaces created while testing the skill
+*-workspace/
+
+# Python and OS noise
+__pycache__/
+*.pyc
+.DS_Store

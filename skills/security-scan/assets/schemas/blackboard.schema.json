@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "security-scan/blackboard.schema.json",
+  "title": "Blackboard",
+  "description": "The shared memory of a run: what exists (nodes), what was observed (facts), what to ask next (intents), how things connect (relations) and what is wrong (findings). Written only through scripts/blackboard.py.",
+  "type": "object",
+  "required": ["run_id", "nodes", "facts", "intents", "relations", "findings"],
+  "additionalProperties": false,
+  "properties": {
+    "run_id": { "type": "string" },
+
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "name"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^N-[0-9]{3,}$" },
+          "kind": {
+            "enum": [
+              "identity", "credential", "compute", "data-store", "network",
+              "control-plane", "pipeline", "repository", "saas-tenant",
+              "ai-service", "external"
+            ]
+          },
+          "name": { "type": "string" },
+          "domain": { "type": "string" },
+          "environment": { "enum": ["production", "non-production", "unknown"] },
+          "environment_basis": { "type": "string", "description": "What the classification rests on." },
+          "crown_jewel": { "type": "boolean", "default": false },
+          "internet_facing": { "type": "boolean", "default": false },
+          "in_scope": { "type": "boolean", "default": true },
+          "attributes": { "type": "object", "description": "Free-form, never a secret value." }
+        }
+      }
+    },
+
+    "facts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "statement", "stage", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^K-[0-9]{3,}$" },
+          "statement": { "type": "string" },
+          "stage": { "type": "integer", "minimum": 0, "maximum": 9 },
+          "pass": { "type": "integer", "minimum": 1, "description": "Inner-loop pass, for stages 3 to 6." },
+          "domain": { "type": "string" },
+          "about": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^N-[0-9]{3,}$" }
+          },
+          "status": { "enum": ["confirmed", "to-validate", "superseded"] },
+          "evidence": {
+            "type": "string",
+            "description": "Path inside the run folder. Required when status is confirmed."
+          },
+          "action": { "type": "string", "description": "The actions.log entry that produced the evidence." },
+          "supersedes": { "type": "string", "pattern": "^K-[0-9]{3,}$" },
+          "recorded_at": { "type": "string", "format": "date-time" }
+        },
+        "if": { "properties": { "status": { "const": "confirmed" } } },
+        "then": { "required": ["evidence"] }
+      }
+    },
+
+    "intents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "question", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^I-[0-9]{3,}$" },
+          "question": { "type": "string" },
+          "origin": { "type": "string", "pattern": "^K-[0-9]{3,}$", "description": "The fact that raised it." },
+          "for_stage": { "type": "integer", "minimum": 1, "maximum": 9 },
+          "domain": { "type": "string" },
+          "status": { "enum": ["open", "answered", "dropped"] },
+          "answered_by": { "type": "string", "pattern": "^K-[0-9]{3,}$" },
+          "dropped_because": { "type": "string" }
+        }
+      }
+    },
+
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "rel", "to", "fact"],
+        "additionalProperties": false,
+        "properties": {
+          "from": { "type": "string", "pattern": "^N-[0-9]{3,}$" },
+          "rel": {
+            "enum": [
+              "authenticates-as", "can-assume", "can-read", "can-write",
+              "can-deploy-to", "reaches", "stores-secret-for", "trusts"
+            ]
+          },
+          "to": { "type": "string", "pattern": "^N-[0-9]{3,}$" },
+          "fact": { "type": "string", "pattern": "^K-[0-9]{3,}$", "description": "Every relation rests on a fact." },
+          "condition": { "type": "string", "description": "What narrows it: network, second factor, approval." }
+        }
+      }
+    },
+
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "finding.schema.json" }
+    },
+
+    "stages": {
+      "type": "object",
+      "description": "Notes per stage, keyed by the stage number: covered, gaps, next, visibility."
+    },
+
+    "coverage": {
+      "type": "array",
+      "description": "How much of each part of the scope the run could see.",
+      "items": {
+        "type": "object",
+        "required": ["part", "seen"],
+        "additionalProperties": false,
+        "properties": {
+          "part": { "type": "string" },
+          "seen": { "enum": ["yes", "partly", "no"] },
+          "note": { "type": "string", "description": "Why not, and what access would show it." },
+          "domain": { "type": "string" }
+        }
+      }
+    }
+  }
+}

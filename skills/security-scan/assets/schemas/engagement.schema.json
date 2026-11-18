@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "security-scan/engagement.schema.json",
+  "title": "Engagement",
+  "description": "What a run covers and the rules it runs under. Stored as engagement.yaml in the run folder.",
+  "type": "object",
+  "required": ["run_id", "created_at", "scope", "mode", "report", "limits", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "pattern": "^[0-9]{8}-[0-9]{4}$",
+      "description": "YYYYMMDD-HHMM, also the name of the run folder."
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": ["string", "null"], "format": "date-time" },
+    "status": { "enum": ["in-progress", "complete", "stopped"] },
+    "scope": {
+      "type": "object",
+      "required": ["kind", "name", "includes"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["repository", "team", "company"] },
+        "name": { "type": "string", "description": "How the user names this scope, used in report titles." },
+        "includes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "Concrete inclusions: repositories, accounts, projects, tenants, services."
+        },
+        "excludes": { "type": "array", "items": { "type": "string" } },
+        "suggested_from": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "The context signals the suggestion came from."
+        },
+        "confirmed_by_user": { "type": "boolean" }
+      }
+    },
+    "mode": {
+      "type": "object",
+      "required": ["read_only", "active_checks"],
+      "additionalProperties": false,
+      "properties": {
+        "read_only": { "const": true },
+        "active_checks": {
+          "type": "boolean",
+          "default": false,
+          "description": "True only when the user opted in to harmless active checks for this run."
+        }
+      }
+    },
+    "report": {
+      "type": "object",
+      "required": ["channel", "language"],
+      "additionalProperties": false,
+      "properties": {
+        "channel": { "enum": ["artifact", "files"] },
+        "artifact_url": { "type": ["string", "null"] },
+        "language": { "type": "string", "description": "Language of the reports, for example pt-BR." }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "required": ["inner_loop_passes"],
+      "additionalProperties": false,
+      "properties": {
+        "inner_loop_passes": { "type": "integer", "minimum": 1, "default": 3 },
+        "calls_per_minute": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "domains": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Domain playbooks in scope, set at the end of stage 0."
+    },
+    "stages_done": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 10 }
+    },
+    "inner_loop": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "passes_run": { "type": "integer", "minimum": 0 },
+        "ended_by": { "enum": ["no-new-facts", "limit", "user", null] }
+      }
+    }
+  }
+}

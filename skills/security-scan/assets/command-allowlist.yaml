@@ -1,0 +1,639 @@
+# Command allowlist for guard.py.
+#
+# guard.py classifies a shell command as `read` only when a rule in this file
+# says so. Anything it does not recognise is `unknown`, and unknown is refused.
+# That is deliberate: a new or unusual command stays blocked until someone has
+# looked at it and added a rule.
+#
+# Classes: read (allowed) · active (allowed only when the run opted in) ·
+# collection (a read that takes a secret value or a copy of the data: refused) ·
+# write · destructive · unknown (all refused).
+#
+# Rule syntax, one string per rule:
+#
+#   words                  the command's leading words after the tool name, flags excluded
+#     *                    exactly one word; shell wildcards work inside a word (list-*)
+#     **                   one or more words
+#     $                    no further words allowed
+#   if-flag A,B            applies only when one of these flags is present
+#   unless-flag A,B        applies only when none of these flags is present
+#   if-flag-value F=V,...  applies only when flag F has value V
+#
+# Before the words of a read or active rule have all been matched, only the
+# tool's `options` and `options_with_value` may appear. Any other flag there
+# makes the command unknown, because guard.py cannot tell whether the next word
+# is that flag's value or the real operation.
+#
+# For each tool, guard.py tests in this order: never_flags, active, verbs,
+# collection, read. Step 3 of the build extends the rules domain by domain.
+version: 2
+
+# A command whose verb is in one of these lists is never read. Where the verb
+# sits depends on the tool; see `verbs` under each tool.
+never_verbs:
+  write:
+    - create
+    - put
+    - update
+    - set
+    - attach
+    - add
+    - tag
+    - untag
+    - apply
+    - patch
+    - deploy
+    - push
+    - publish
+    - rotate
+    - enable
+    - disable
+    - start
+    - stop
+    - restart
+    - reboot
+    - restore
+    - import
+    - modify
+    - associate
+    - register
+    - replace
+    - edit
+    - scale
+    - rollout
+    - exec
+    - run
+    - invoke
+    - send
+    - commit
+    - merge
+    - rebase
+    - checkout
+    - switch
+    - stash
+    - init
+    - revert
+    - label
+    - annotate
+    - taint
+    - untaint
+    - cordon
+    - uncordon
+    - drain
+    - login
+    - logout
+    - build
+    - authorize
+    - grant
+    - allocate
+    - assign
+    - copy
+    - upload
+    - approve
+    - enroll
+    - release
+  destructive:
+    - delete
+    - remove
+    - rm
+    - rmi
+    - destroy
+    - terminate
+    - purge
+    - drop
+    - truncate
+    - revoke
+    - kill
+    - wipe
+    - reset
+    - detach
+    - deregister
+    - disassociate
+    - clean
+    - prune
+    - cancel
+    - deactivate
+  collection:
+    - download
+    - clone
+    - export
+    - dump
+    - backup
+    - pull
+    - fetch
+    - decrypt
+
+# Paths whose contents must never be printed. Metadata (ls -l, stat) is fine.
+protected_paths:
+  - "~/.aws/credentials"
+  - "~/.aws/sso/cache/*"
+  - "~/.aws/cli/cache/*"
+  - "~/.config/gcloud/*"
+  - "~/.azure/*"
+  - "~/.kube/config"
+  - "~/.docker/config.json"
+  - "~/.ssh/id_*"
+  - "~/.ssh/*_rsa"
+  - "~/.ssh/*_ed25519"
+  - "~/.netrc"
+  - "~/.npmrc"
+  - "~/.pypirc"
+  - "~/.git-credentials"
+  - "~/.config/gh/hosts.yml"
+  - "~/.vault-token"
+  - "~/.pgpass"
+  - "~/.my.cnf"
+  - "~/.terraform.d/credentials.tfrc.json"
+  - "~/.claude.json"
+  - "**/.env"
+  - "**/.env.*"
+  - "**/*.pem"
+  - "**/*.key"
+  - "**/*.p12"
+  - "**/*.pfx"
+  - "**/terraform.tfstate"
+  - "**/terraform.tfstate.*"
+  - "**/*.tfvars"
+
+# Environment assignments allowed in front of a command (NAME=value command).
+allowed_env:
+  - AWS_PROFILE
+  - AWS_REGION
+  - AWS_DEFAULT_REGION
+  - AWS_PAGER
+  - KUBECONFIG
+  - CLOUDSDK_CORE_PROJECT
+  - CLOUDSDK_ACTIVE_CONFIG_NAME
+  - GH_HOST
+  - GH_REPO
+  - NO_COLOR
+  - LC_ALL
+  - LANG
+  - TZ
+  - PAGER
+
+# Commands that only change how another command runs. guard.py classifies what
+# they wrap. The number is how many of the wrapper's own arguments to skip.
+wrappers:
+  time: 0
+  timeout: 1
+  nice: 0
+
+shell:
+  # Print facts about files or the system, never file contents.
+  metadata:
+    - ls
+    - stat
+    - file
+    - wc
+    - du
+    - df
+    - pwd
+    - whoami
+    - id
+    - uname
+    - date
+    - which
+    - type
+    - basename
+    - dirname
+    - realpath
+    - readlink
+    - "true"
+    - test
+    - echo
+    - printf
+    - sw_vers
+    - arch
+    - uptime
+    - ps
+    - lsof
+    - netstat
+    - ss
+  # Print file contents. Refused when an argument is a protected path.
+  content:
+    - cat
+    - head
+    - tail
+    - grep
+    - egrep
+    - fgrep
+    - rg
+    - jq
+    - cut
+    - sort
+    - uniq
+    - tr
+    - column
+    - nl
+    - tac
+    - comm
+    - diff
+    - cmp
+    - shasum
+    - sha256sum
+    - md5
+    - md5sum
+  content_never_flags:
+    sort: ["-o", "--output"]
+    rg: ["--pre", "--pre-glob"]
+  # Print secret values by design.
+  collection:
+    - env
+    - printenv
+    - set
+    - export
+    - history
+    - pbpaste
+    - security
+  # Change the filesystem. mkdir and tee are allowed only inside the run folder.
+  write:
+    - touch
+    - cp
+    - mv
+    - ln
+    - chmod
+    - chown
+    - install
+    - tar
+    - zip
+    - unzip
+    - gzip
+    - gunzip
+    - sed
+    - awk
+    - perl
+    - open
+  destructive:
+    - rm
+    - rmdir
+    - dd
+    - shred
+    - kill
+    - pkill
+    - killall
+    - shutdown
+    - reboot
+    - diskutil
+  find_never_flags:
+    "-delete": destructive
+    "-exec": unknown
+    "-execdir": unknown
+    "-ok": unknown
+    "-okdir": unknown
+    "-fprint": write
+    "-fprint0": write
+    "-fprintf": write
+    "-fls": write
+  # Requests that leave the machine but change nothing.
+  active_tools:
+    - dig
+    - nslookup
+    - host
+    - whois
+  curl:
+    require_flag: ["-I", "--head"]
+    never_flags: ["-X", "--request", "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "-F", "--form", "-T", "--upload-file", "-o", "--output", "-O", "--remote-name", "-u", "--user", "-b", "--cookie", "-c", "--cookie-jar", "-K", "--config", "-H", "--header", "--json"]
+
+tools:
+  aws:
+    # aws <service> <operation>: the verb is the operation's first hyphen part.
+    verbs: "hyphen-prefix@1"
+    options_with_value: ["--profile", "--region", "--output", "--query", "--endpoint-url", "--cli-read-timeout", "--cli-connect-timeout", "--ca-bundle", "--color", "--cli-binary-format"]
+    options: ["--no-paginate", "--no-cli-pager", "--no-verify-ssl", "--debug", "--no-sign-request", "--no-cli-auto-prompt"]
+    active:
+      - "* * if-flag --dry-run"
+    collection:
+      - "secretsmanager get-secret-value"
+      - "secretsmanager batch-get-secret-value"
+      - "ssm get-parameter*"
+      - "s3 cp"
+      - "s3 sync"
+      - "s3 mv"
+      - "s3 presign"
+      - "s3api get-object"
+      - "s3api select-object-content"
+      - "dynamodb scan"
+      - "dynamodb query"
+      - "dynamodb get-item"
+      - "dynamodb batch-get-item"
+      - "dynamodb execute-statement"
+      - "rds-data *"
+      - "kms decrypt"
+      - "kms generate-data-key*"
+      - "sts get-session-token"
+      - "sts get-federation-token"
+      - "sts assume-role*"
+      - "ecr get-login-password"
+      - "ecr get-authorization-token"
+      - "eks get-token"
+      - "codeartifact get-authorization-token"
+      - "rds generate-db-auth-token"
+      - "redshift get-cluster-credentials*"
+      - "sso get-role-credentials"
+      - "ec2 get-password-data"
+      - "ec2 get-console-output"
+      - "ec2 get-console-screenshot"
+      - "ec2 describe-instance-attribute if-flag-value --attribute=userData"
+      - "apigateway get-api-key if-flag --include-value"
+      - "apigateway get-api-keys if-flag --include-values"
+      - "appsync list-api-keys"
+      - "lambda get-function $"
+      - "logs get-log-events"
+      - "logs filter-log-events"
+    read:
+      - "sts get-caller-identity"
+      - "configure list"
+      - "configure list-profiles"
+      - "* list-*"
+      - "* describe-*"
+      - "iam get-*"
+      - "iam simulate-principal-policy"
+      - "iam simulate-custom-policy"
+      - "* get-*policy*"
+      - "* get-*-attributes"
+      - "* get-*-configuration"
+      - "s3 ls"
+      - "s3api get-bucket-*"
+      - "s3api get-public-access-block"
+      - "s3control get-public-access-block"
+      - "account get-*"
+      - "organizations describe-*"
+      - "kms get-key-rotation-status"
+      - "ec2 get-ebs-encryption-by-default"
+      - "lambda get-function-url-config"
+      - "cloudtrail get-trail-status"
+      - "cloudtrail get-event-selectors"
+      - "guardduty get-detector"
+      - "apigateway get-rest-apis"
+      - "apigateway get-stages"
+      - "apigatewayv2 get-apis"
+
+  gcloud:
+    # Command groups vary in depth, so every word after the first is checked
+    # against never_verbs. The first word is a group name (run, deploy, tasks).
+    verbs: "exact@1+"
+    options_with_value: ["--project", "--account", "--configuration", "--format", "--verbosity"]
+    options: ["--quiet", "-q"]
+    collection:
+      - "secrets versions access"
+      - "auth print-access-token"
+      - "auth print-identity-token"
+      - "auth application-default print-access-token"
+      - "storage cp"
+      - "storage cat"
+      - "container clusters get-credentials"
+      - "sql export **"
+    read:
+      - "auth list"
+      - "config list"
+      - "config get-value *"
+      - "config configurations list"
+      - "** list"
+      - "** describe"
+      - "** get-iam-policy"
+      - "projects get-ancestors"
+      - "asset search-all-resources"
+      - "asset search-all-iam-policies"
+      - "asset analyze-iam-policy"
+
+  az:
+    # Conservative on purpose: many `list` and `show` commands in az return keys.
+    verbs: "exact@1+"
+    options_with_value: ["--subscription", "--output", "-o", "--query"]
+    options: ["--only-show-errors"]
+    collection:
+      - "keyvault secret show"
+      - "keyvault secret download"
+      - "keyvault key download"
+      - "keyvault certificate download"
+      - "storage blob download*"
+      - "storage file download*"
+      - "account get-access-token"
+      - "acr credential show"
+      - "** keys list"
+      - "** keys show"
+      - "** list-keys"
+      - "** show-connection-string"
+      - "** list-connection-strings"
+      - "webapp config appsettings list"
+      - "functionapp config appsettings list"
+      - "webapp config connection-string list"
+      - "webapp deployment list-publishing-*"
+    active:
+      - "deployment * validate"
+      - "deployment * what-if"
+    read:
+      - "account show"
+      - "account list"
+      - "ad signed-in-user show"
+      - "role assignment list"
+      - "role definition list"
+      - "group list"
+      - "resource list"
+      - "vm list"
+      - "storage account list"
+      - "storage account show"
+      - "keyvault list"
+      - "keyvault show"
+      - "keyvault secret list"
+      - "ad app list"
+      - "ad sp list"
+      - "ad app credential list"
+      - "ad sp credential list"
+      - "ad group list"
+      - "network nsg list"
+      - "network public-ip list"
+      - "webapp list"
+      - "functionapp list"
+      - "aks list"
+      - "sql server list"
+      - "monitor diagnostic-settings list"
+      - "policy assignment list"
+      - "lock list"
+
+  kubectl:
+    verbs: "exact@0"
+    options_with_value: ["-n", "--namespace", "--context", "--kubeconfig", "--cluster", "--request-timeout", "-s", "--server"]
+    options: ["-A", "--all-namespaces"]
+    never_flags:
+      "--as": write
+      "--as-group": write
+      "--as-uid": write
+      "--token": write
+      "--username": write
+      "--password": write
+      "--client-key": write
+      "--client-certificate": write
+      "--raw": collection
+    collection:
+      - "get secret* if-flag -o,--output,--template"
+      - "cluster-info dump"
+      - "logs"
+      - "cp"
+      - "port-forward"
+      - "proxy"
+    read:
+      - "config get-contexts"
+      - "config current-context"
+      - "config get-clusters"
+      - "config get-users"
+      - "config view"
+      - "auth whoami"
+      - "auth can-i **"
+      - "get *"
+      - "describe *"
+      - "api-resources"
+      - "api-versions"
+      - "version"
+      - "cluster-info $"
+      - "top *"
+      - "explain *"
+
+  gh:
+    # gh <noun> <verb>: the verb is the second word.
+    verbs: "exact@1"
+    options_with_value: ["-R", "--repo", "--hostname", "-X", "--method", "-f", "-F", "--field", "--raw-field", "--input", "-H", "--header", "--jq", "-q", "--template", "--json", "-L", "--limit"]
+    collection:
+      - "auth token"
+      - "auth status if-flag --show-token,-t"
+    read:
+      - "auth status"
+      - "api * unless-flag -X,--method,-f,-F,--field,--raw-field,--input"
+      - "api * if-flag-value -X=GET,--method=GET"
+      - "* list"
+      - "* view"
+      - "* status"
+      - "search *"
+
+  git:
+    verbs: "exact@0"
+    options_with_value: ["-C", "--git-dir", "--work-tree"]
+    options: ["--no-pager", "--get", "--get-all", "--get-regexp", "--list", "-l", "--global", "--local", "--system", "--show-origin"]
+    never_flags:
+      "-c": write
+      "--exec-path": write
+      "--config-env": write
+      "--upload-pack": write
+      "--receive-pack": write
+      "--output": write
+      "--ext-diff": write
+    read:
+      - "status"
+      - "log"
+      - "show"
+      - "diff"
+      - "remote $"
+      - "remote show *"
+      - "remote get-url *"
+      - "branch $"
+      - "tag $"
+      - "ls-files"
+      - "ls-tree"
+      - "ls-remote"
+      - "grep"
+      - "rev-parse"
+      - "rev-list"
+      - "describe"
+      - "blame"
+      - "shortlog"
+      - "cat-file"
+      - "check-ignore"
+      - "for-each-ref"
+      - "show-ref"
+      - "merge-base"
+      - "name-rev"
+      - "count-objects"
+      - "worktree list"
+      - "stash list"
+      - "submodule status"
+      - "config * $ if-flag --get,--get-all,--get-regexp"
+      - "config $ if-flag --list,-l"
+
+  docker:
+    verbs: "exact@0,1"
+    options_with_value: ["--context", "-c", "--host", "-H", "--config"]
+    read:
+      - "ps"
+      - "images"
+      - "inspect"
+      - "info"
+      - "version"
+      - "history"
+      - "context ls"
+      - "context inspect"
+      - "image ls"
+      - "image inspect"
+      - "image history"
+      - "container ls"
+      - "container inspect"
+      - "network ls"
+      - "network inspect"
+      - "volume ls"
+      - "volume inspect"
+      - "compose ps"
+      - "compose ls"
+
+  terraform:
+    verbs: "exact@0"
+    collection:
+      - "state pull"
+      - "state show"
+      - "output"
+      - "show"
+    read:
+      - "version"
+      - "providers $"
+      - "validate"
+      - "state list"
+      - "graph"
+
+  # Platform CLIs: only the "who am I" command, which discover_access.py runs.
+  glab:
+    verbs: "exact@1"
+    read:
+      - "auth status"
+  wrangler:
+    verbs: "exact@0"
+    read:
+      - "whoami"
+  vercel:
+    verbs: "exact@0"
+    read:
+      - "whoami"
+  netlify:
+    verbs: "exact@0"
+    read:
+      - "status"
+  fly:
+    verbs: "exact@0"
+    read:
+      - "auth whoami"
+  flyctl:
+    verbs: "exact@0"
+    read:
+      - "auth whoami"
+  heroku:
+    verbs: "exact@0"
+    read:
+      - "auth:whoami"
+  firebase:
+    verbs: "exact@0"
+    read:
+      - "login:list"
+  doctl:
+    verbs: "exact@0"
+    read:
+      - "account get"
+  pulumi:
+    verbs: "exact@0"
+    read:
+      - "whoami"
+  op:
+    verbs: "exact@0"
+    read:
+      - "whoami"
+  npm:
+    verbs: "exact@0"
+    read:
+      - "whoami"

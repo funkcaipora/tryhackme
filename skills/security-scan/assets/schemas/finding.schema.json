@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "security-scan/finding.schema.json",
+  "title": "Finding",
+  "description": "A weakness, resting on one or more facts, with its priority, evidence status, fix and exploitability note.",
+  "type": "object",
+  "required": ["id", "title", "stage", "priority", "evidence", "facts", "entry", "reach", "impact", "visibility", "fix", "exploit"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^F-[0-9]{3,}$" },
+    "title": { "type": "string", "description": "One sentence that says what is wrong and where." },
+    "stage": { "type": "integer", "minimum": 0, "maximum": 9 },
+    "domain": { "type": "string" },
+    "environment": { "enum": ["production", "non-production", "unknown"] },
+
+    "priority": { "enum": ["P0", "P1", "P2"] },
+    "evidence": { "enum": ["confirmed", "to-validate", "dropped"] },
+    "to_confirm": {
+      "type": "string",
+      "description": "For to-validate findings: exactly what would confirm it."
+    },
+
+    "entry": { "enum": ["none", "exposed-credential", "low-privilege", "high-privilege"] },
+    "reach": { "enum": ["direct", "1-2 steps", "3+ steps", "no path shown"] },
+    "impact": { "enum": ["critical", "significant", "limited"] },
+    "visibility": { "enum": ["alerted", "logged-only", "silent", "unknown"] },
+
+    "rule": { "type": "string", "description": "The grading criterion that decided the priority, for example P0.4." },
+    "modifiers": {
+      "type": "array",
+      "items": { "enum": ["silent", "isolated", "choke-point"] },
+      "uniqueItems": true
+    },
+    "override": {
+      "type": "object",
+      "required": ["priority", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "priority": { "enum": ["P0", "P1", "P2"] },
+        "reason": { "type": "string" }
+      }
+    },
+
+    "facts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "^K-[0-9]{3,}$" }
+    },
+    "paths": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^P-[0-9]{3,}$" },
+      "description": "Attack paths this finding sits on, set in stage 9."
+    },
+
+    "fix": {
+      "type": "object",
+      "required": ["summary", "layer"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "type": "string", "description": "The change to make, specific enough to act on." },
+        "layer": { "type": "integer", "minimum": 1, "maximum": 5, "description": "Defense layer, see defense-layers.md." },
+        "interim": { "type": "string", "description": "A mitigation to apply now when the full fix takes time." }
+      }
+    },
+
+    "exploit": {
+      "type": "object",
+      "required": ["condition", "gain"],
+      "additionalProperties": false,
+      "description": "What could be exploited. A description, never a payload or instructions.",
+      "properties": {
+        "condition": { "type": "string" },
+        "gain": { "type": "string" },
+        "leads_to_stage": { "type": "integer", "minimum": 1, "maximum": 8 }
+      }
+    },
+
+    "attack": {
+      "type": "object",
+      "required": ["primary"],
+      "additionalProperties": false,
+      "properties": {
+        "primary": { "type": "string", "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$" },
+        "name": { "type": "string" },
+        "enables": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$" }
+        }
+      }
+    },
+
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "by": { "type": "string" },
+        "note": { "type": "string" }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}
